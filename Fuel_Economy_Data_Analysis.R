@@ -1,8 +1,18 @@
-library(tidyverse)
-library(h2o)
+library(tidyverse) 
+library(data.table)
+library(rstudioapi)
+library(recipes)
 library(caret)
+library(skimr)
+library(purrr)
+library(inspectdf)
+library(mice)
+library(graphics)
+library(Hmisc)
 library(glue)
+library(highcharter)
 library(plotly)
+library(h2o)  
 
 #1. Add ggplot2::mpg dataset
 df = ggplot2::mpg
@@ -51,6 +61,7 @@ df.chr <- df %>% select_if(is.character)
 df.chr <- dummyVars(" ~ .", data = df.chr) %>% predict(newdata = df.chr) %>% as.data.frame()
 df <- cbind(df.chr, dfnum ) %>% select(cty, everything())
 
+names(df) <- names(df) %>% str_replace_all(" ", "_") %>% str_replace_all("\\(", "_") %>% str_replace_all("\\)", "_")
 
 # Multicollinearity
 
@@ -90,6 +101,12 @@ h2o_data <- df %>% as.h2o()
 h2o_data <- h2o_data %>% h2o.splitFrame(ratios = 0.8, seed = 123)
 train <- h2o_data[[1]]
 test <- h2o_data[[2]]
+
+target <- 'cty'
+features <- df %>% select(-cty) %>% names()
+
+
+# Fitting h2o model ----
 
 model <- h2o.glm(
   x = features, y = target,
@@ -160,13 +177,13 @@ y_pred$predict
 
 # ----------------------------- Model evaluation -----------------------------
 test_set <- test %>% as.data.frame()
-residuals = test_set$Life_expectancy - y_pred$predict
+residuals = test_set$cty - y_pred$predict
 
 # Calculate RMSE (Root Mean Square Error) ----
 RMSE = sqrt(mean(residuals^2))
 
 # Calculate Adjusted R2 (R Squared) ----
-y_test_mean = mean(test_set$Life_expectancy)
+y_test_mean = mean(test_set$cty)
 
 tss = sum((test_set$cty - y_test_mean)^2) #total sum of squares
 rss = sum(residuals^2) #residual sum of squares
@@ -253,3 +270,4 @@ tibble(RMSE_train = round(RMSE_train,1),
        
        Adjusted_R2_train,
        Adjusted_R2_test = Adjusted_R2)
+
